@@ -1,7 +1,46 @@
 ﻿@page "/"
+@inject IJSRuntime JsRuntime
+@rendermode InteractiveServer
 
 <PageTitle>Home</PageTitle>
 
 <h1>Hello, world!</h1>
 
 Welcome to your new app.
+
+<div @ref="scrollContainer" class="scroll-container">
+    @foreach (var message in messages)
+    {
+        <p>@message</p>
+    }
+</div>
+
+<style>
+    .scroll-container {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        margin-top: 20px;
+        padding: 10px;
+    }
+</style>
+
+<button class="btn btn-primary" @onclick="AddMessage">Click me</button>
+
+
+
+@code {
+    private List<string> messages = new List<string>();
+    private ElementReference scrollContainer;
+
+    private void AddMessage()
+    {
+        messages.Add("Hello there");
+        ScrollToBottom();
+    }
+
+    private async Task ScrollToBottom()
+    {
+         await JsRuntime.InvokeVoidAsync("scrollToBottom", scrollContainer);
+    }
+}
