@@ -1,6 +1,11 @@
 ﻿@page "/"
 @inject IJSRuntime JsRuntime
+@inject IConfiguration configuration
 @rendermode InteractiveServer
+
+@using Microsoft.SemanticKernel;
+@using Microsoft.SemanticKernel.Connectors.OpenAI;
+@using Kernel = Microsoft.SemanticKernel.Kernel;
 
 <PageTitle>Home</PageTitle>
 
@@ -25,22 +30,75 @@ Welcome to your new app.
     }
 </style>
 
-<button class="btn btn-primary" @onclick="AddMessage">Click me</button>
+<input type="text" @bind="inputMessage" />
+<button class="btn btn-primary" @onclick="(() => AddMessage(inputMessage))">Click me</button>
 
 
 
 @code {
     private List<string> messages = new List<string>();
     private ElementReference scrollContainer;
+    private string inputMessage = "";
 
-    private void AddMessage()
+    const string skPrompt = @"
+ChatBot can have a conversation with you about any topic.
+It can give explicit instructions or say 'I don't know' if it does not have an answer.
+
+{{$history}}
+User: {{$userInput}}
+ChatBot:";
+
+    IKernelBuilder? _builder; 
+    Kernel? _kernel;
+    KernelArguments _arguments = new KernelArguments()
+        {
+            ["history"] = ""
+        };
+    KernelFunction? _chatFunction;
+
+
+
+    protected override async Task OnInitializedAsync()
     {
-        messages.Add("Hello there");
-        ScrollToBottom();
+        //Create Kernel builder
+        _builder = Kernel.CreateBuilder();
+        var apiKey = configuration["OPENAI_KEY"];
+        _builder.AddOpenAIChatCompletion("gpt-3.5-turbo", apiKey);
+
+        _kernel = _builder.Build();
+
+
+
+        var executionSettings = new OpenAIPromptExecutionSettings
+            {
+                MaxTokens = 2000,
+                Temperature = 0.7,
+                TopP = 0.5
+            };
+
+        _chatFunction = _kernel.CreateFunctionFromPrompt(skPrompt, executionSettings);
+    }
+
+    private async Task AddMessage(string message)
+    {
+        messages.Add(message);
+        _arguments["userInput"] = message;
+        var bot_answer = await _chatFunction.InvokeAsync(_kernel, _arguments);
+        messages.Add(bot_answer.GetValue<string>());
+
+        var result = $"\nUser: {message}\nAI: {bot_answer}\n";
+        _arguments["history"] = _arguments["history"] + result;
+
+        
     }
 
     private async Task ScrollToBottom()
     {
-         await JsRuntime.InvokeVoidAsync("scrollToBottom", scrollContainer);
+        await JsRuntime.InvokeVoidAsync("scrollToBottom", scrollContainer);
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await ScrollToBottom();
+    } 
 }

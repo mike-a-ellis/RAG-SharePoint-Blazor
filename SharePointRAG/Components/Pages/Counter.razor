@@ -1,5 +1,5 @@
 ﻿@page "/counter"
-@rendermode InteractiveServer
+@rendermode @(new InteractiveAutoRenderMode(prerender:false))
 
 <PageTitle>Counter</PageTitle>
 
@@ -16,4 +16,10 @@
     {
         currentCount++;
     }
-}
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+    }
+
+    }
